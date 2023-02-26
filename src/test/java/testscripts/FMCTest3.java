@@ -9,9 +9,10 @@ import org.testng.annotations.Test;
 import base.BaseService;
 import constants.Status_Code;
 import io.restassured.response.Response;
+import services.GenerateTokenService;
 import utilities.DataGenerator;
 
-public class FMCTest2 {
+public class FMCTest3 {
 
 	String token;
 	Response res;
@@ -21,14 +22,16 @@ public class FMCTest2 {
 	String fullName = DataGenerator.getFullName();
 	String phoneNumber = DataGenerator.getPhoneNumber();
 	String password = "pass@123";
-	
+	GenerateTokenService generateTokenService = new GenerateTokenService();
 
 	@Test
 	public void createToken() {
-		Map<String, String> headerMap = baseService.getHeaderWithoutAuth();
-		res = baseService.executeGetAPI("/fmc/token", headerMap);
+		Response res = generateTokenService.getTokenResponse();
+		System.out.println(res.asPrettyString());
 		token = res.jsonPath().get("accessToken");
 		Assert.assertEquals(res.getStatusCode(), Status_Code.OK);
+		Assert.assertTrue(token.length() >0);
+		Assert.assertEquals(res.jsonPath().get("tokenType"), "bearer");
 		System.out.println(token);
 	}
 	
@@ -37,9 +40,7 @@ public class FMCTest2 {
 		JSONObject emailSignUpPayLoad = new JSONObject();
 		emailSignUpPayLoad.put("email_id", emailId);
 		
-		Map<String, String> headerMap = baseService.getHeaderHavingAuth(token);
-		res = baseService.executePostAPI("/fmc/email-signup-automation", headerMap, emailSignUpPayLoad);
-		
+		res = generateTokenService.getEmailSignupResponse(emailSignUpPayLoad);
 		otp = res.jsonPath().getString("content.otp");
 		Assert.assertEquals(res.getStatusCode(), Status_Code.CREATED);
 	}
@@ -47,7 +48,11 @@ public class FMCTest2 {
 	@SuppressWarnings("unchecked")
 	@Test(priority = 2)
 	public void verifyOtp() {
-		
+		if(otp == null) {
+			JSONObject emailSignUpPayLoad = new JSONObject();
+			emailSignUpPayLoad.put("email_id", emailId);
+			otp = generateTokenService.getOptFromEmailSignUpResponse(emailSignUpPayLoad);
+		}
 		JSONObject verifyOtpPayload = new JSONObject();
 		verifyOtpPayload.put("email_id",emailId);
 		verifyOtpPayload.put("full_name", fullName);
@@ -55,10 +60,22 @@ public class FMCTest2 {
 		verifyOtpPayload.put("password", password);
 		verifyOtpPayload.put("otp", otp);
 		
-		Map<String, String> headerMap = baseService.getHeaderHavingAuth(token);
-		res = baseService.executePutAPI("/fmc/verify-otp/", headerMap, verifyOtpPayload);
+		res = generateTokenService.getVerifyOptResponse(verifyOtpPayload);
 		Assert.assertEquals(res.getStatusCode(), Status_Code.OK);
 		int userId = res.jsonPath().getInt("content.userId");
-		System.out.println(res.asPrettyString());
+		System.out.println(userId);
+		
+		
+		userId = generateTokenService.getUserId(emailId, "pass123");
+		System.out.println(userId);
 	}
+	
+	@Test
+	public void verifyOpt1() {
+		int userId = generateTokenService.getUserId(emailId, "pass123");
+		System.out.println(userId);
+	}
+	
+	
 }
+
